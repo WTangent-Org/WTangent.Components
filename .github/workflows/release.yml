@@ -1,18 +1,13 @@
 name: release
 
-# Agent.Components 发布：release-please 管版本 → 合并后 pack + 推送 nuget.org（Trusted Publishing 免密）
-on:
-  push:
-    branches: [main]
-name: release
-
+# WTangent.Components 发布：release-please 管版本 → 合并后 pack + 推送 nuget.org（Trusted Publishing 免密）
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
       version:
-        description: '手动指定版本（如 0.5.1；留空则按提交类型自动）'
+        description: '手动指定版本（如 0.0.1；留空则按提交类型自动）'
         required: false
 
 permissions:
