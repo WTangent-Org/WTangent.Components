@@ -1,0 +1,97 @@
+name: release
+
+# Agent.Components 发布：release-please 管版本 → 合并后 pack + 推送 nuget.org（Trusted Publishing 免密）
+on:
+  push:
+    branches: [main]
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '手动指定版本（如 0.5.1；留空则按提交类型自动）'
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  # NuGet/login@v1（Trusted Publishing OIDC）需要
+  id-token: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 手动发版模式：仅 workflow_dispatch（手动）或 release PR 合并（创建 release）才跑 release-please
+      - name: 判断本次是否值得发版
+        id: should
+        run: |
+          MSG=$(git log -1 --format=%s)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "手动触发 → 发版"
+          elif echo "$MSG" | grep -qE '^chore\(main\): release'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "release PR 合并 → 创建 release"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "普通提交 → 不发版（要发版：Actions 页手动运行 release workflow）"
+          fi
+
+      - uses: googleapis/release-please-action@v4
+        if: steps.should.outputs.run == 'true'
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
+          release-as: ${{ github.event.inputs.version }}
+
+      # 自动合并 release PR（PAT；手动 dispatch 不自动合并——直接发布）
+      - name: 自动合并 release PR（squash）
+        if: steps.release.outputs.prs != '' && steps.release.outputs.prs != '[]' && github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          PR_NUMBER=$(echo '${{ steps.release.outputs.prs }}' | python3 -c "import json,sys; prs=json.load(sys.stdin); print(prs[0]['number'])")
+          for i in $(seq 1 300); do
+            STATE=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json mergeStateStatus --jq '.mergeStateStatus' 2>&1 || echo UNKNOWN)
+            echo "PR #$PR_NUMBER mergeState: $STATE"
+            if [ "$STATE" = "CLEAN" ]; then break; fi
+            sleep 5
+          done
+          gh pr merge "$PR_NUMBER" --repo "${{ github.repository }}" --squash --delete-branch
+          echo "已自动 squash 合并 release PR #$PR_NUMBER"
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: release-please
+    # 手动 dispatch 直接发布（不依赖 release-please/自动合并完成）；或 release PR 合并后发布
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.release-please.outputs.release_created == 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: dotnet pack
+        run: dotnet pack WtTangent.Components.csproj -c Release -o out --nologo
+
+      # Trusted Publishing：nuget.org 策略绑定 Repository=WTangent-Org/WTangent.Components + Workflow File=release.yml
+      - name: NuGet login（Trusted Publishing）
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: wt598412
+
+      - name: 推送 nuget.org
+        run: dotnet nuget push out/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.login.outputs.NUGET_API_KEY }}

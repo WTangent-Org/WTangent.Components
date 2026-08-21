@@ -1,0 +1,5 @@
+## A streamlined .gitignore for modern .NET projects
+bin/
+obj/
+.vs/
+*.user

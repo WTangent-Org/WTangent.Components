@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 一个包两个 TFM：netstandard2.0 = 源生成器（编译器加载）；net10.0 = 契约（组件引用） -->
+    <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <RootNamespace>WTangent.Components</RootNamespace>
+    <PackageId>WTangent.Components</PackageId>
+    <Version>0.4.0</Version>
+    <Description>wtangent 组件共享包：源生成器（[AgentComponent]/[AgentDefault]/[AgentTool] → Entry）+ 运行时契约（ITool/WtAgentApp/Http）</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- IDE0005 需要 GenerateDocumentationFile；文档注释缺失不警告 -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- 按 TFM 分流源码：netstandard2.0 只编生成器+特性；net10.0 只编契约+特性 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <Compile Remove="App/**;Http.cs;Tool.cs"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" PrivateAssets="all"/>
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <Compile Remove="AgentComponentGenerator.cs"/>
+  </ItemGroup>
+
+  <!-- net10.0 契约项目原为 ImplicitUsings enable（契约文件无显式 using） -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- 程序集名按 TFM 区分：生成器 dll 与契约 dll 不同名（同包同目录不冲突） -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <AssemblyName>WTangent.Components</AssemblyName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <AssemblyName>WTangent.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NuGet analyzer 约定：analyzers/dotnet/cs 下 dll 作为 analyzer 分发；lib/net10.0 提供契约引用 -->
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" Condition="'$(TargetFramework)' == 'netstandard2.0'"/>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="lib/net10.0" Visible="false" Condition="'$(TargetFramework)' == 'net10.0'"/>
+  </ItemGroup>
+
+  <!-- pack 静态评估阶段 TargetFramework 为空，None 的 Condition 会失效 → 用官方 TFM 特定内容机制 -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);AddTfmPackageContent</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+  <Target Name="AddTfmPackageContent">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(OutputPath)\WTangent.Components.dll" PackagePath="analyzers/dotnet/cs" Condition="'$(TargetFramework)' == 'netstandard2.0'"/>
+      <TfmSpecificPackageFile Include="$(OutputPath)\WTangent.Core.dll" PackagePath="lib/net10.0" Condition="'$(TargetFramework)' == 'net10.0'"/>
+    </ItemGroup>
+  </Target>
+
+</Project>

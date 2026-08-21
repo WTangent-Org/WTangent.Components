@@ -1,0 +1,9 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- 风格检查全量提为 warning：dotnet build 直接输出 -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+</Project>

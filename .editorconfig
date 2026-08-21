@@ -1,0 +1,30 @@
+root = true
+
+[*.cs]
+# 集合表达式（IDE0300/0301/0305）
+dotnet_diagnostic.IDE0300.severity = warning
+dotnet_diagnostic.IDE0301.severity = warning
+dotnet_diagnostic.IDE0305.severity = warning
+# 主构造函数（IDE0290）
+dotnet_diagnostic.IDE0290.severity = warning
+# 反转 if（IDE0045/0046）
+dotnet_diagnostic.IDE0045.severity = warning
+dotnet_diagnostic.IDE0046.severity = warning
+# 模式匹配（IDE0078/0019/0020/0066/0170）
+dotnet_diagnostic.IDE0078.severity = warning
+dotnet_diagnostic.IDE0019.severity = warning
+dotnet_diagnostic.IDE0020.severity = warning
+dotnet_diagnostic.IDE0066.severity = warning
+dotnet_diagnostic.IDE0170.severity = warning
+# 命名（IDE1006）
+dotnet_diagnostic.IDE1006.severity = warning
+# CA 性能/正确性（CA1861/1866/1068）
+dotnet_diagnostic.CA1861.severity = warning
+dotnet_diagnostic.CA1866.severity = warning
+dotnet_diagnostic.CA1068.severity = warning
+# 冗余 using（IDE0005）
+dotnet_diagnostic.IDE0005.severity = warning
+
+[*.{csproj,props,targets}]
+indent_style = space
+indent_size = 2
