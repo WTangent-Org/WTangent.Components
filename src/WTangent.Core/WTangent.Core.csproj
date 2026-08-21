@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>WTangent.Core</RootNamespace>
     <AssemblyName>WTangent.Core</AssemblyName>
-    <Version>0.0.2</Version>
+    <Version>0.1.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
