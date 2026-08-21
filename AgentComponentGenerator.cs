@@ -24,7 +24,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // 收集 [AgentComponent] 类。注意：不用 ForAttributeWithMetadataName——
-        // Roslyn 5.3 在编译引用含某些类型（如 WTangent.Core.WtAgentApp）时该 API 静默收集为空，
+        // Roslyn 5.3 在编译引用含某些类型（如 WTangent.Core.Application）时该 API 静默收集为空，
         // 改用 CreateSyntaxProvider + 语义模型特性检查（兼容所有 Roslyn 版本）。
         var commands = context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax,
@@ -140,7 +140,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         // 运行时上下文：宿主（空壳 Client 接收器）启动时注入同一 WtAgentApp 引用；
         // 组件代码经 Entry.App 访问 Logger/Events/Config/Store/Remote/Services（组件间不互引 dll）
         sb.AppendLine("        /// <summary>运行时上下文（宿主注入；引用同一实例，组件与宿主共享状态）</summary>");
-        sb.AppendLine("        public static WTangent.Core.WtAgentApp? App { get; set; }");
+        sb.AppendLine("        public static WTangent.Core.Application? App { get; set; }");
         sb.AppendLine("    }");
         sb.AppendLine("}");
 

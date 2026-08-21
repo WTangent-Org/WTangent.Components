@@ -9,8 +9,8 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <RootNamespace>WTangent.Components</RootNamespace>
     <PackageId>WTangent.Components</PackageId>
-    <Version>0.0.1</Version>
-    <Description>wtangent 组件共享包：源生成器（[AgentComponent]/[AgentDefault]/[AgentTool] → Entry）+ 运行时契约（ITool/WtAgentApp/Http）</Description>
+    <Version>0.0.2</Version>
+    <Description>wtangent 组件共享包：源生成器（[AgentComponent]/[AgentDefault]/[AgentTool] → Entry）+ 运行时契约（ITool/Application/Http）</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <!-- IDE0005 需要 GenerateDocumentationFile；文档注释缺失不警告 -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

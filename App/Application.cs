@@ -6,7 +6,7 @@ namespace WTangent.Core;
 /// （Entry.App，引用传递）。组件间不互引 dll，协作全走 App：
 /// 下行 = 宿主注入能力；上行 = Services 注册能力 + Events 广播。
 /// 本类只承载契约（接口），实现在宿主；组件引 WTangent.Core 包即可用。</summary>
-public sealed class WtAgentApp
+public sealed class Application
 {
     public ILogger Logger { get; init; } = null!;
     public IEventBus Events { get; init; } = null!;
