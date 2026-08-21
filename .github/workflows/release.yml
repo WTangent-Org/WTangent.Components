@@ -50,9 +50,9 @@ jobs:
           manifest-file: .release-please-manifest.json
           release-as: ${{ github.event.inputs.version }}
 
-      # 自动合并 release PR（PAT；手动 dispatch 不自动合并——直接发布）
+      # 自动合并 release PR（PAT）：手动 dispatch 与 release PR 合并均自动合并，版本同步到 main 全自动
       - name: 自动合并 release PR（squash）
-        if: steps.release.outputs.prs != '' && steps.release.outputs.prs != '[]' && github.event_name != 'workflow_dispatch'
+        if: steps.release.outputs.prs != '' && steps.release.outputs.prs != '[]'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
