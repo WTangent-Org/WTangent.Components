@@ -5,7 +5,9 @@
       "include-v-in-tag": true,
       "initial-version": "0.0.1",
       "extra-files": [
-        { "type": "xml", "path": "WTangent.Components.csproj", "xpath": "//Version" }
+        { "type": "xml", "path": "WTangent.Components.csproj", "xpath": "//Version" },
+        { "type": "xml", "path": "src/WTangent.Components/WTangent.Components.csproj", "xpath": "//Version" },
+        { "type": "xml", "path": "src/WTangent.Core/WTangent.Core.csproj", "xpath": "//Version" }
       ]
     }
   }

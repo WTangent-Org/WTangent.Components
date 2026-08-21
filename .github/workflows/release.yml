@@ -78,8 +78,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: dotnet pack
-        run: dotnet pack WTangent.Components.csproj -c Release -o out --nologo
+      - name: 构建生成器 + 契约 + 打包
+        run: |
+          dotnet build src/WTangent.Components/Generator.csproj -c Release --nologo
+          dotnet build src/WTangent.Core/WTangent.Core.csproj -c Release --nologo
+          dotnet pack WTangent.Components.csproj -c Release -o out --nologo
 
       # Trusted Publishing：nuget.org 策略绑定 Repository=WTangent-Org/WTangent.Components + Workflow File=release.yml
       - name: NuGet login（Trusted Publishing）
