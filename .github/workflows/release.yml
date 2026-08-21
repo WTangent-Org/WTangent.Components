@@ -79,7 +79,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: dotnet pack
-        run: dotnet pack WtTangent.Components.csproj -c Release -o out --nologo
+        run: dotnet pack WTangent.Components.csproj -c Release -o out --nologo
 
       # Trusted Publishing：nuget.org 策略绑定 Repository=WTangent-Org/WTangent.Components + Workflow File=release.yml
       - name: NuGet login（Trusted Publishing）
