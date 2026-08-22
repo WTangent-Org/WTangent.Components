@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -9,23 +8,19 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace WTangent.Components;
 
-/// <summary>增量源生成器：完整生成组件入口 Entry——
-/// Commands = 收集 [AgentComponent] 标记的 Command 子类（serve/tui/gui/cmd 共用，无标注时为空数组）；
-/// Default = [AgentDefault] 标记的静态方法（未标记则 null）；
-/// Tools = 收集 [AgentTool] 标记的 ITool 实现类（tool 组件用；非 tool 组件不生成，不引入 Core 引用）。
-/// 生成目标命名空间 = 项目 RootNamespace。组件不再手写 Entry。</summary>
+/// <summary>增量源生成器（scope 式依赖收集）：为手写 Entry 服务——
+/// 收集 [AgentComponent] 标记的 Command 子类 + [AgentTool] 标记的 ITool 实现类，
+/// 生成 partial class Entry 的另一半（CollectedCommands / CollectedTools 属性）；
+/// 手写 Entry 里接线（Commands => CollectedCommands）。Entry 生命周期归手写。</summary>
 [Generator]
 public sealed class AgentComponentGenerator : IIncrementalGenerator
 {
     private const string ComponentAttr = "WTangent.Components.AgentComponentAttribute";
-    private const string DefaultAttr = "WTangent.Components.AgentDefaultAttribute";
     private const string ToolAttr = "WTangent.Components.AgentToolAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // 收集 [AgentComponent] 类。注意：不用 ForAttributeWithMetadataName——
-        // Roslyn 5.3 在编译引用含某些类型（如 WTangent.Core.Application）时该 API 静默收集为空，
-        // 改用 CreateSyntaxProvider + 语义模型特性检查（兼容所有 Roslyn 版本）。
+        // 收集 [AgentComponent] 类（CreateSyntaxProvider：不依赖 ForAttributeWithMetadataName 的匹配怪癖）
         var commands = context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, _) => GetAttributedClass(ctx, ComponentAttr))
@@ -33,15 +28,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
             .Select(static (s, _) => s!)
             .Collect();
 
-        // 标记了 [AgentDefault] 的方法（组件顶级行为；0 或 1 个）
-        var defaults = context.SyntaxProvider.CreateSyntaxProvider(
-                static (node, _) => node is MethodDeclarationSyntax,
-                static (ctx, _) => GetAttributedMethod(ctx, DefaultAttr))
-            .Where(static s => s is not null)
-            .Select(static (s, _) => s!)
-            .Collect();
-
-        // 标记了 [AgentTool] 的类（LLM 工具）
+        // 收集 [AgentTool] 类（LLM 工具）
         var tools = context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, _) => GetAttributedClass(ctx, ToolAttr))
@@ -49,7 +36,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
             .Select(static (s, _) => s!)
             .Collect();
 
-        // 项目 RootNamespace（生成 Entry 的命名空间）
+        // 项目 RootNamespace（生成 Entry partial 的命名空间）
         var rootNs = context.AnalyzerConfigOptionsProvider
             .Select(static (p, _) =>
             {
@@ -58,8 +45,8 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
             });
 
         context.RegisterSourceOutput(
-            commands.Combine(defaults).Combine(tools).Combine(rootNs),
-            static (spc, pair) => Emit(spc, pair.Left.Left.Left, pair.Left.Left.Right, pair.Left.Right, pair.Right));
+            commands.Combine(tools).Combine(rootNs),
+            static (spc, pair) => Emit(spc, pair.Left.Left, pair.Left.Right, pair.Right));
     }
 
     private static INamedTypeSymbol? GetAttributedClass(GeneratorSyntaxContext ctx, string attrFullName) =>
@@ -67,27 +54,13 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         && ctx.SemanticModel.GetDeclaredSymbol(cls) is INamedTypeSymbol sym
         && HasAttribute(sym, attrFullName) ? sym : null;
 
-    private static IMethodSymbol? GetAttributedMethod(GeneratorSyntaxContext ctx, string attrFullName) =>
-        ctx.Node is MethodDeclarationSyntax mtd
-        && ctx.SemanticModel.GetDeclaredSymbol(mtd) is IMethodSymbol sym
-        && HasAttribute(sym, attrFullName) ? sym : null;
-
     private static bool HasAttribute(ISymbol symbol, string attrFullName) =>
         symbol.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == attrFullName);
 
     private static void Emit(SourceProductionContext spc, ImmutableArray<INamedTypeSymbol> commands,
-        ImmutableArray<IMethodSymbol> defaults, ImmutableArray<INamedTypeSymbol> tools, string rootNs)
+        ImmutableArray<INamedTypeSymbol> tools, string rootNs)
     {
-        if (commands.IsDefaultOrEmpty && tools.IsDefaultOrEmpty && defaults.Length == 0) return;
-        if (defaults.Length > 1)
-        {
-            spc.ReportDiagnostic(Diagnostic.Create(
-                new DiagnosticDescriptor("AGEN001", "AgentDefault 重复",
-                    "组件只能有一个 [AgentDefault] 方法，发现 {0} 个", "Components",
-                    DiagnosticSeverity.Error, true),
-                Location.None, defaults.Length));
-            return;
-        }
+        if (commands.IsDefaultOrEmpty && tools.IsDefaultOrEmpty) return;
 
         var sb = new StringBuilder();
         sb.AppendLine("// <auto-generated by Components.AgentComponentGenerator />");
@@ -95,52 +68,28 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         sb.AppendLine();
         sb.AppendLine($"namespace {rootNs}");
         sb.AppendLine("{");
-        sb.AppendLine("    /// <summary>组件入口（空壳 ALC 加载后注册命令）：Commands 自动收集 [AgentComponent]，Default 来自 [AgentDefault]</summary>");
-        sb.AppendLine("    public static class Entry");
+        sb.AppendLine("    /// <summary>Entry 的生成部分（依赖收集产物）：手写 partial Entry 里接线（Commands => CollectedCommands 等）</summary>");
+        sb.AppendLine("    public sealed partial class Entry");
         sb.AppendLine("    {");
-        if (commands.Length > 0)
+        sb.AppendLine("        /// <summary>收集的组件命令（[AgentComponent]）</summary>");
+        sb.AppendLine("        private static System.CommandLine.Command[] CollectedCommands =>");
+        sb.AppendLine("        [");
+        foreach (var cmd in commands)
         {
-            sb.AppendLine("        /// <summary>组件命令列表</summary>");
-            sb.AppendLine("        public static System.CommandLine.Command[] Commands { get; } =");
-            sb.AppendLine("        [");
-
-            foreach (var cmd in commands)
-            {
-                var name = GetCommandName(cmd);
-                var fullType = cmd.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                sb.AppendLine($"            new {fullType}(),   // {name}");
-            }
-
-            sb.AppendLine("        ];");
+            var name = GetCommandName(cmd);
+            var fullType = cmd.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            sb.AppendLine($"            new {fullType}(),   // {name}");
         }
-        if (defaults.Length == 1)
+        sb.AppendLine("        ];");
+        sb.AppendLine("        /// <summary>收集的 LLM 工具（[AgentTool]）</summary>");
+        sb.AppendLine("        private static WTangent.Core.ITool[] CollectedTools =>");
+        sb.AppendLine("        [");
+        foreach (var t in tools)
         {
-            var m = defaults[0];
-            var fmt = SymbolDisplayFormat.FullyQualifiedFormat.AddMemberOptions(SymbolDisplayMemberOptions.IncludeContainingType);
-            sb.AppendLine("        /// <summary>顶级行为（[AgentDefault] 标记的方法）</summary>");
-            sb.AppendLine($"        public static System.Func<string[], int>? Default => {m.ToDisplayString(fmt)};");
+            var fullType = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            sb.AppendLine($"            new {fullType}(),   // {t.Name}");
         }
-        else
-        {
-            sb.AppendLine("        /// <summary>顶级行为：无 [AgentDefault] 标记 → null（必须显式子命令）</summary>");
-            sb.AppendLine("        public static System.Func<string[], int>? Default => null;");
-        }
-        if (tools.Length > 0)
-        {
-            sb.AppendLine("        /// <summary>LLM 工具列表（[AgentTool] 标记的 ITool 实现，serve 加载 tool 组件时合并）</summary>");
-            sb.AppendLine("        public static WTangent.Core.ITool[] Tools { get; } =");
-            sb.AppendLine("        [");
-            foreach (var t in tools)
-            {
-                var fullType = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                sb.AppendLine($"            new {fullType}(),   // {t.Name}");
-            }
-            sb.AppendLine("        ];");
-        }
-        // 运行时上下文：宿主（空壳 Client 接收器）启动时注入同一 WtAgentApp 引用；
-        // 组件代码经 Entry.App 访问 Logger/Events/Config/Store/Remote/Services（组件间不互引 dll）
-        sb.AppendLine("        /// <summary>运行时上下文（宿主注入；引用同一实例，组件与宿主共享状态）</summary>");
-        sb.AppendLine("        public static WTangent.Core.Application? App { get; set; }");
+        sb.AppendLine("        ];");
         sb.AppendLine("    }");
         sb.AppendLine("}");
 

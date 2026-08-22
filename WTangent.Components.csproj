@@ -6,7 +6,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageId>WTangent.Components</PackageId>
-    <Version>0.0.2</Version>
+    <Version>0.0.3</Version>
     <Description>wtangent 组件共享包：源生成器（[AgentComponent]/[AgentDefault]/[AgentTool] → Entry）+ 运行时契约（ITool/Application/Http）</Description>
     <!-- netstandard2.0 自身无 lib 产物（内容经 TfmSpecificPackageFile 注入），NU5128 属预期 -->
     <NoWarn>$(NoWarn);NU5128</NoWarn>
