@@ -3,10 +3,13 @@ using System.CommandLine;
 namespace WTangent.Core;
 
 /// <summary>组件入口契约：手写实现（组件形态自由组合）。
-/// 壳加载 dll 后找 IEntry 实现 → StartAsync(App) 注入 → 按能力注册：
+/// 壳加载 dll 后找 IEntry 实现 → 实例化 → 注入 App → StartAsync → 按能力注册：
 /// Commands 非空 → 注册命令（含父路径挂接）；Default 非空 → 顶级行为；Tools 非空 → serve 合并工具。</summary>
 public interface IEntry
 {
+    /// <summary>宿主运行时上下文（构造注入，只读；组件内静态访问：Entry.Current.App）</summary>
+    Application App { get; }
+
     /// <summary>组件标识（= components.json 索引别名，如 serve / tui / client / git）</summary>
     string Identifier { get; }
 
