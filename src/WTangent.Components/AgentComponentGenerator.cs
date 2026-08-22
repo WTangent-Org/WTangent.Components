@@ -8,35 +8,51 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace WTangent.Components;
 
-/// <summary>增量源生成器（scope 式依赖收集）：为手写 Entry 服务——
-/// 收集 [AgentComponent] 标记的 Command 子类 + [AgentTool] 标记的 ITool 实现类，
-/// 生成 partial class Entry 的另一半（CollectedCommands / CollectedTools 属性）；
-/// 手写 Entry 里接线（Commands => CollectedCommands）。Entry 生命周期归手写。</summary>
+/// <summary>增量源生成器（scope 式依赖收集 + 入口元数据注入）：
+/// [AgentComponent] → CollectedCommands（含父路径）；[AgentTool] → CollectedTools；
+/// [AgentEvent] 方法 → CollectedSubscribe(IEventBus)；[Entry]/[EntryScope] → Identifier/Name/SupportAsyncStart/Scope。
+/// 产物 = partial class Entry 的另一半，手写 Entry 接线引用。</summary>
 [Generator]
 public sealed class AgentComponentGenerator : IIncrementalGenerator
 {
     private const string ComponentAttr = "WTangent.Components.AgentComponentAttribute";
     private const string ToolAttr = "WTangent.Components.AgentToolAttribute";
+    private const string EventAttr = "WTangent.Components.AgentEventAttribute";
+    private const string EntryAttr = "WTangent.Components.EntryAttribute";
+    private const string EntryScopeAttr = "WTangent.Components.EntryScopeAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // 收集 [AgentComponent] 类（CreateSyntaxProvider：不依赖 ForAttributeWithMetadataName 的匹配怪癖）
+        // [AgentComponent] 命令类
         var commands = context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, _) => GetAttributedClass(ctx, ComponentAttr))
-            .Where(static s => s is not null)
-            .Select(static (s, _) => s!)
-            .Collect();
+            .Where(static s => s is not null).Select(static (s, _) => s!).Collect();
 
-        // 收集 [AgentTool] 类（LLM 工具）
+        // [AgentTool] 工具类
         var tools = context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, _) => GetAttributedClass(ctx, ToolAttr))
-            .Where(static s => s is not null)
-            .Select(static (s, _) => s!)
-            .Collect();
+            .Where(static s => s is not null).Select(static (s, _) => s!).Collect();
 
-        // 项目 RootNamespace（生成 Entry partial 的命名空间）
+        // [AgentEvent] 事件处理方法
+        var events = context.SyntaxProvider.CreateSyntaxProvider(
+                static (node, _) => node is MethodDeclarationSyntax,
+                static (ctx, _) => GetAttributedMethod(ctx, EventAttr))
+            .Where(static s => s is not null).Select(static (s, _) => s!).Collect();
+
+        // [Entry] 入口类（元数据）
+        var entries = context.SyntaxProvider.CreateSyntaxProvider(
+                static (node, _) => node is ClassDeclarationSyntax,
+                static (ctx, _) => GetAttributedClass(ctx, EntryAttr))
+            .Where(static s => s is not null).Select(static (s, _) => s!).Collect();
+
+        // [EntryScope] 作用域类
+        var scopes = context.SyntaxProvider.CreateSyntaxProvider(
+                static (node, _) => node is ClassDeclarationSyntax,
+                static (ctx, _) => GetAttributedClass(ctx, EntryScopeAttr))
+            .Where(static s => s is not null).Select(static (s, _) => s!).Collect();
+
         var rootNs = context.AnalyzerConfigOptionsProvider
             .Select(static (p, _) =>
             {
@@ -45,8 +61,9 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
             });
 
         context.RegisterSourceOutput(
-            commands.Combine(tools).Combine(rootNs),
-            static (spc, pair) => Emit(spc, pair.Left.Left, pair.Left.Right, pair.Right));
+            commands.Combine(tools).Combine(events).Combine(entries).Combine(scopes).Combine(rootNs),
+            static (spc, pair) => Emit(spc, pair.Left.Left.Left.Left.Left, pair.Left.Left.Left.Left.Right,
+                pair.Left.Left.Left.Right, pair.Left.Left.Right, pair.Left.Right, pair.Right));
     }
 
     private static INamedTypeSymbol? GetAttributedClass(GeneratorSyntaxContext ctx, string attrFullName) =>
@@ -54,13 +71,21 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         && ctx.SemanticModel.GetDeclaredSymbol(cls) is INamedTypeSymbol sym
         && HasAttribute(sym, attrFullName) ? sym : null;
 
+    private static IMethodSymbol? GetAttributedMethod(GeneratorSyntaxContext ctx, string attrFullName) =>
+        ctx.Node is MethodDeclarationSyntax mtd
+        && ctx.SemanticModel.GetDeclaredSymbol(mtd) is IMethodSymbol sym
+        && HasAttribute(sym, attrFullName) ? sym : null;
+
     private static bool HasAttribute(ISymbol symbol, string attrFullName) =>
         symbol.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == attrFullName);
 
-    private static void Emit(SourceProductionContext spc, ImmutableArray<INamedTypeSymbol> commands,
-        ImmutableArray<INamedTypeSymbol> tools, string rootNs)
+    private static void Emit(SourceProductionContext spc,
+        ImmutableArray<INamedTypeSymbol> commands, ImmutableArray<INamedTypeSymbol> tools,
+        ImmutableArray<IMethodSymbol> events, ImmutableArray<INamedTypeSymbol> entries,
+        ImmutableArray<INamedTypeSymbol> scopes, string rootNs)
     {
-        if (commands.IsDefaultOrEmpty && tools.IsDefaultOrEmpty) return;
+        if (commands.IsDefaultOrEmpty && tools.IsDefaultOrEmpty && events.IsDefaultOrEmpty
+            && entries.IsDefaultOrEmpty && scopes.IsDefaultOrEmpty) return;
 
         var sb = new StringBuilder();
         sb.AppendLine("// <auto-generated by Components.AgentComponentGenerator />");
@@ -68,33 +93,108 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         sb.AppendLine();
         sb.AppendLine($"namespace {rootNs}");
         sb.AppendLine("{");
-        sb.AppendLine("    /// <summary>Entry 的生成部分（依赖收集产物）：手写 partial Entry 里接线（Commands => CollectedCommands 等）</summary>");
+        sb.AppendLine("    /// <summary>Entry 的生成部分（收集产物 + 元数据）：手写 partial Entry 里接线引用</summary>");
         sb.AppendLine("    public sealed partial class Entry");
         sb.AppendLine("    {");
-        sb.AppendLine("        /// <summary>收集的组件命令（[AgentComponent]）</summary>");
-        sb.AppendLine("        private static System.CommandLine.Command[] CollectedCommands =>");
-        sb.AppendLine("        [");
-        foreach (var cmd in commands)
+
+        // [Entry] 元数据
+        foreach (var e in entries)
         {
-            var name = GetCommandName(cmd);
-            var fullType = cmd.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            sb.AppendLine($"            new {fullType}(),   // {name}");
+            var (id, name, asyncStart) = ReadEntryAttr(e);
+            if (id is null) continue;
+            sb.AppendLine("        /// <summary>组件标识（[Entry]）</summary>");
+            sb.AppendLine($"        public string Identifier => \"{id}\";");
+            sb.AppendLine("        /// <summary>组件显示名（[Entry]）</summary>");
+            sb.AppendLine($"        public string Name => \"{name}\";");
+            sb.AppendLine("        /// <summary>是否支持异步启动（[Entry] Async）</summary>");
+            sb.AppendLine($"        public bool SupportAsyncStart => {(asyncStart ? "true" : "false")};");
         }
-        sb.AppendLine("        ];");
-        sb.AppendLine("        /// <summary>收集的 LLM 工具（[AgentTool]）</summary>");
-        sb.AppendLine("        private static WTangent.Core.ITool[] CollectedTools =>");
-        sb.AppendLine("        [");
-        foreach (var t in tools)
+        // [EntryScope] 作用域
+        foreach (var s in scopes)
         {
-            var fullType = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            sb.AppendLine($"            new {fullType}(),   // {t.Name}");
+            var scope = ReadScopeAttr(s);
+            if (scope is null) continue;
+            sb.AppendLine("        /// <summary>作用域（[EntryScope]；缺省 = Identifier）</summary>");
+            sb.AppendLine($"        public string Scope => \"{scope}\";");
         }
-        sb.AppendLine("        ];");
+        // 命令收集（含父路径）
+        if (commands.Length > 0)
+        {
+            sb.AppendLine("        /// <summary>收集的组件命令（[AgentComponent]）：(命令, 父路径)</summary>");
+            sb.AppendLine("        private static (System.CommandLine.Command Command, string? ParentPath)[] CollectedCommands =>");
+            sb.AppendLine("        [");
+            foreach (var cmd in commands)
+            {
+                var name = GetCommandName(cmd);
+                var parent = ReadParentAttr(cmd);
+                var fullType = cmd.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                var parentLit = parent is null ? "null" : $"\"{parent}\"";
+                sb.AppendLine($"            (new {fullType}(), {parentLit}),   // {name}");
+            }
+            sb.AppendLine("        ];");
+        }
+        // 工具收集
+        if (tools.Length > 0)
+        {
+            sb.AppendLine("        /// <summary>收集的 LLM 工具（[AgentTool]）</summary>");
+            sb.AppendLine("        private static WTangent.Core.ITool[] CollectedTools =>");
+            sb.AppendLine("        [");
+            foreach (var t in tools)
+            {
+                var fullType = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                sb.AppendLine($"            new {fullType}(),   // {t.Name}");
+            }
+            sb.AppendLine("        ];");
+        }
+        // 事件订阅收集
+        if (events.Length > 0)
+        {
+            sb.AppendLine("        /// <summary>收集的事件订阅（[AgentEvent]）：手写 StartAsync 里 CollectedSubscribe(app.Events)</summary>");
+            sb.AppendLine("        private static void CollectedSubscribe(WTangent.Core.IEventBus events)");
+            sb.AppendLine("        {");
+            foreach (var m in events)
+            {
+                var key = ReadEventKey(m);
+                if (key is null) continue;
+                var fmt = SymbolDisplayFormat.FullyQualifiedFormat.AddMemberOptions(SymbolDisplayMemberOptions.IncludeContainingType);
+                sb.AppendLine($"            events.Subscribe(\"{key}\", {m.ToDisplayString(fmt)});");
+            }
+            sb.AppendLine("        }");
+        }
         sb.AppendLine("    }");
         sb.AppendLine("}");
 
         spc.AddSource("Entry.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
     }
+
+    private static (string? Id, string? Name, bool Async) ReadEntryAttr(INamedTypeSymbol type)
+    {
+        foreach (var attr in type.GetAttributes().Where(a => a.AttributeClass?.ToDisplayString() == EntryAttr))
+        {
+            var id = attr.ConstructorArguments.ElementAtOrDefault(0).Value as string;
+            var name = attr.ConstructorArguments.ElementAtOrDefault(1).Value as string;
+            var asyncStart = attr.NamedArguments.FirstOrDefault(kv => kv.Key == "Async").Value.Value is true;
+            return (id, name, asyncStart);
+        }
+        return (null, null, false);
+    }
+
+    private static string? ReadScopeAttr(INamedTypeSymbol type) =>
+        type.GetAttributes().Where(a => a.AttributeClass?.ToDisplayString() == EntryScopeAttr)
+            .Select(a => a.ConstructorArguments.ElementAtOrDefault(0).Value as string)
+            .FirstOrDefault();
+
+    private static string? ReadParentAttr(INamedTypeSymbol type) =>
+        type.GetAttributes().Where(a => a.AttributeClass?.ToDisplayString() == ComponentAttr)
+            .SelectMany(a => a.NamedArguments)
+            .Where(kv => kv is { Key: "Parent", Value.Value: string { Length: > 0 } })
+            .Select(kv => (string?)kv.Value.Value)
+            .FirstOrDefault();
+
+    private static string? ReadEventKey(IMethodSymbol method) =>
+        method.GetAttributes().Where(a => a.AttributeClass?.ToDisplayString() == EventAttr)
+            .Select(a => a.ConstructorArguments.ElementAtOrDefault(0).Value as string)
+            .FirstOrDefault();
 
     private static string GetCommandName(INamedTypeSymbol cmd)
     {
