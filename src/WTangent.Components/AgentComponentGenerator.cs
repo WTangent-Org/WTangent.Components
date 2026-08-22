@@ -16,10 +16,10 @@ namespace WTangent.Components;
 [Generator]
 public sealed class AgentComponentGenerator : IIncrementalGenerator
 {
-    private const string ComponentAttr = "WTangent.Components.AgentComponentAttribute";
+    private const string ComponentAttr = "WTangent.Components.AgentCommandAttribute";
     private const string ToolAttr = "WTangent.Components.AgentToolAttribute";
     private const string EventAttr = "WTangent.Components.AgentEventAttribute";
-    private const string EntryAttr = "WTangent.Components.EntryAttribute";
+    private const string EntryAttr = "WTangent.Components.AgentEntryAttribute";
     private const string EntryScopeAttr = "WTangent.Components.EntryScopeAttribute";
     private const string EntryStartAttr = "WTangent.Components.EntryStartAttribute";
     private const string EntryStopAttr = "WTangent.Components.EntryStopAttribute";
@@ -81,11 +81,13 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
             && entries.IsDefaultOrEmpty && scopes.IsDefaultOrEmpty) return;
 
         // [Entry] 元数据 + 生命周期钩子（在带 [Entry] 的类上找 [EntryStart]/[EntryStop]）
-        string? id = null; bool isAsync = false; IMethodSymbol? startHook = null; IMethodSymbol? stopHook = null;
+        string? id = null; string? displayName = null; bool isAsync = false;
+        IMethodSymbol? startHook = null; IMethodSymbol? stopHook = null;
         foreach (var e in entries)
         {
-            var (eid, easync) = ReadEntryAttr(e);
+            var (eid, ename, easync) = ReadEntryAttr(e);
             if (eid is not null) id = eid;
+            if (ename is not null) displayName = ename;
             isAsync = easync;
             startHook ??= e.GetMembers().OfType<IMethodSymbol>()
                 .FirstOrDefault(m => HasAttribute(m, EntryStartAttr));
@@ -93,6 +95,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
                 .FirstOrDefault(m => HasAttribute(m, EntryStopAttr));
         }
         id ??= rootNs.Split('.').Last().ToLowerInvariant();
+        displayName ??= id;
         var scope = scopes.Select(ReadScopeAttr).FirstOrDefault(s => s is not null);
 
         var sb = new StringBuilder();
@@ -106,8 +109,8 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         sb.AppendLine("    {");
         sb.AppendLine("        /// <summary>组件标识（[Entry] id 覆盖或 RootNamespace 末段小写）</summary>");
         sb.AppendLine($"        public string Identifier => \"{id}\";");
-        sb.AppendLine("        /// <summary>组件显示名（= Identifier）</summary>");
-        sb.AppendLine($"        public string Name => \"{id}\";");
+        sb.AppendLine("        /// <summary>组件显示名（[Entry] name 覆盖或 = Identifier）</summary>");
+        sb.AppendLine($"        public string Name => \"{displayName}\";");
         sb.AppendLine("        /// <summary>是否支持异步启动（[Entry] isAsync）</summary>");
         sb.AppendLine($"        public bool SupportAsyncStart => {(isAsync ? "true" : "false")};");
         if (scope is not null)
@@ -188,15 +191,16 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
     private static bool ReturnsTask(IMethodSymbol m) =>
         m.ReturnType.Name is "Task" or "ValueTask";
 
-    private static (string? Id, bool Async) ReadEntryAttr(INamedTypeSymbol type)
+    private static (string? Id, string? Name, bool Async) ReadEntryAttr(INamedTypeSymbol type)
     {
         foreach (var attr in type.GetAttributes().Where(a => a.AttributeClass?.ToDisplayString() == EntryAttr))
         {
-            var isAsync = attr.ConstructorArguments.ElementAtOrDefault(0).Value is true;
-            var id = attr.ConstructorArguments.ElementAtOrDefault(1).Value as string;
-            return (id, isAsync);
+            var id = attr.ConstructorArguments.ElementAtOrDefault(0).Value as string;
+            var name = attr.ConstructorArguments.ElementAtOrDefault(1).Value as string;
+            var isAsync = attr.ConstructorArguments.ElementAtOrDefault(2).Value is true;
+            return (id, name, isAsync);
         }
-        return (null, false);
+        return (null, null, false);
     }
 
     private static string? ReadScopeAttr(INamedTypeSymbol type) =>
@@ -206,10 +210,8 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
 
     private static string? ReadParentAttr(INamedTypeSymbol type) =>
         type.GetAttributes().Where(a => a.AttributeClass?.ToDisplayString() == ComponentAttr)
-            .SelectMany(a => a.NamedArguments)
-            .Where(kv => kv is { Key: "Parent", Value.Value: string { Length: > 0 } })
-            .Select(kv => (string?)kv.Value.Value)
-            .FirstOrDefault();
+            .Select(a => a.ConstructorArguments.ElementAtOrDefault(0).Value as string)
+            .FirstOrDefault(s => s is { Length: > 0 });
 
     private static string? ReadEventKey(IMethodSymbol method) =>
         method.GetAttributes().Where(a => a.AttributeClass?.ToDisplayString() == EventAttr)
@@ -218,13 +220,6 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
 
     private static string GetCommandName(INamedTypeSymbol cmd)
     {
-        foreach (var kv in cmd.GetAttributes()
-                     .Where(attr => attr.AttributeClass?.ToDisplayString() == ComponentAttr)
-                     .SelectMany(attr => attr.NamedArguments))
-        {
-            if (kv is { Key: "Name", Value.Value: string { Length: > 0 } s })
-                return s;
-        }
         var name = cmd.Name;
         const string suffix = "Command";
         if (name.EndsWith(suffix, StringComparison.Ordinal) && name.Length > suffix.Length)
