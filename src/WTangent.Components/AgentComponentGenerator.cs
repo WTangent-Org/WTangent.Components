@@ -107,13 +107,10 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         sb.AppendLine("    /// <summary>Entry 的生成部分（元数据 + 收集产物 + 生命周期接线）：手写 partial Entry 只留钩子</summary>");
         sb.AppendLine("    public sealed partial class Entry");
         sb.AppendLine("    {");
-        sb.AppendLine("        /// <summary>宿主运行时上下文（构造注入，只读；无 null!）</summary>");
-        sb.AppendLine("        public WTangent.Core.Application App { get; }");
-        sb.AppendLine("        /// <summary>当前实例（构造时更新；组件内部静态访问：Entry.Current.App）</summary>");
-        sb.AppendLine("        private static Entry? _current;");
-        sb.AppendLine("        public static Entry Current => _current ?? throw new System.InvalidOperationException(\"Entry 未实例化\");");
-        sb.AppendLine("        /// <summary>构造注入：App + Current 一步到位（PCL-CE 式）</summary>");
-        sb.AppendLine("        public Entry(WTangent.Core.Application app) { App = app; _current = this; }");
+        sb.AppendLine("        /// <summary>宿主运行时上下文（静态，构造注入；组件代码直接 Entry.App）</summary>");
+        sb.AppendLine("        public static WTangent.Core.Application App = null!;");
+        sb.AppendLine("        /// <summary>构造注入：静态 App 赋值（PCL-CE 式；null! 为静态固有，组件作者不可见）</summary>");
+        sb.AppendLine("        public Entry(WTangent.Core.Application app) => App = app;");
         sb.AppendLine("        /// <summary>组件标识（[Entry] id 覆盖或 RootNamespace 末段小写）</summary>");
         sb.AppendLine($"        public string Identifier => \"{id}\";");
         sb.AppendLine("        /// <summary>组件显示名（[Entry] name 覆盖或 = Identifier）</summary>");
