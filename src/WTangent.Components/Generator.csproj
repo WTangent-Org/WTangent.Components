@@ -9,7 +9,7 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <RootNamespace>WTangent.Components</RootNamespace>
     <AssemblyName>WTangent.Components</AssemblyName>
-    <Version>0.0.9</Version>
+    <Version>0.0.10</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- RS1035：分析器禁文件 IO——此处刻意为之（写 agent-component.json 到仓根，内容不变不写、失败不炸构建） -->
     <NoWarn>$(NoWarn);CS1591;RS1035</NoWarn>
