@@ -39,10 +39,25 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
                 return ns is { Length: > 0 } ? ns : "Agent";
             });
 
+        // 写 agent-component.json 需要的 MSBuild 属性（随包 buildTransitive props 声明为 CompilerVisibleProperty）
+        var manifestProps = context.AnalyzerConfigOptionsProvider
+            .Select(static (p, _) =>
+            {
+                p.GlobalOptions.TryGetValue("build_property.ProjectDir", out var dir);
+                p.GlobalOptions.TryGetValue("build_property.AssemblyName", out var asm);
+                return (ProjDir: dir, AsmName: asm);
+            });
+
         context.RegisterSourceOutput(
-            commands.Combine(tools).Combine(events).Combine(entries).Combine(scopes).Combine(rootNs),
-            static (spc, pair) => Emit(spc, pair.Left.Left.Left.Left.Left, pair.Left.Left.Left.Left.Right,
-                pair.Left.Left.Left.Right, pair.Left.Left.Right, pair.Left.Right, pair.Right));
+            commands.Combine(tools).Combine(events).Combine(entries).Combine(scopes).Combine(rootNs)
+                .Combine(context.CompilationProvider).Combine(manifestProps),
+            static (spc, pair) =>
+            {
+                var left = pair.Left.Left;   // (((((commands, tools), events), entries), scopes), rootNs)
+                Emit(spc, left.Left.Left.Left.Left.Left, left.Left.Left.Left.Left.Right,
+                    left.Left.Left.Left.Right, left.Left.Left.Right, left.Left.Right, left.Right,
+                    pair.Left.Right, pair.Right.ProjDir, pair.Right.AsmName);
+            });
     }
 
     private static IncrementalValueProvider<ImmutableArray<INamedTypeSymbol>> CollectClasses(
@@ -75,7 +90,8 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
     private static void Emit(SourceProductionContext spc,
         ImmutableArray<INamedTypeSymbol> commands, ImmutableArray<INamedTypeSymbol> tools,
         ImmutableArray<IMethodSymbol> events, ImmutableArray<INamedTypeSymbol> entries,
-        ImmutableArray<INamedTypeSymbol> scopes, string rootNs)
+        ImmutableArray<INamedTypeSymbol> scopes, string rootNs,
+        Compilation compilation, string? projDir, string? asmName)
     {
         if (commands.IsDefaultOrEmpty && tools.IsDefaultOrEmpty && events.IsDefaultOrEmpty
             && entries.IsDefaultOrEmpty && scopes.IsDefaultOrEmpty) return;
@@ -96,6 +112,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         }
         id ??= rootNs.Split('.').Last().ToLowerInvariant();
         displayName ??= id;
+        WriteManifest(projDir, asmName, id, commands, tools, compilation);
         var scope = scopes.Select(ReadScopeAttr).FirstOrDefault(s => s is not null);
 
         var sb = new StringBuilder();
@@ -191,6 +208,53 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
 
         spc.AddSource("Entry.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
     }
+
+    /// <summary>写 agent-component.json 到仓根（空壳 install 时拉取）：name/asset/minCore/commands/tools。
+    /// minCore = 编译引用的 Core 程序集版本（空壳门禁：内置 Core 低于它则拒装）。
+    /// 内容不变不写（避免反复触发增量重建）；写失败不炸构建，下次构建再写。</summary>
+    private static void WriteManifest(string? projDir, string? asmName, string id,
+        ImmutableArray<INamedTypeSymbol> commands, ImmutableArray<INamedTypeSymbol> tools,
+        Compilation compilation)
+    {
+        if (projDir is not { Length: > 0 }) return;
+        try
+        {
+            var coreVer = compilation.ReferencedAssemblyNames
+                .FirstOrDefault(n => n.Name == "WTangent.Core")?.Version;
+            var sb = new StringBuilder();
+            sb.Append("{ \"name\": \"").Append(id)
+              .Append("\", \"asset\": \"").Append(asmName is { Length: > 0 } ? asmName : id).Append('"');
+            if (coreVer is not null)
+                sb.Append(", \"minCore\": \"").Append(TrimRevision(coreVer)).Append('"');
+            AppendNames(sb, "commands", commands, static c => GetCommandName(c));
+            AppendNames(sb, "tools", tools, static t => t.Name);
+            sb.AppendLine(" }");
+            var path = System.IO.Path.Combine(projDir, "agent-component.json");
+            var content = sb.ToString();
+            if (System.IO.File.Exists(path) && System.IO.File.ReadAllText(path) == content) return;
+            System.IO.File.WriteAllText(path, content);
+        }
+        catch { /* manifest 写失败忽略，下次构建再写 */ }
+    }
+
+    private static void AppendNames(StringBuilder sb, string key,
+        ImmutableArray<INamedTypeSymbol> symbols, Func<INamedTypeSymbol, string> nameOf)
+    {
+        if (symbols.IsDefaultOrEmpty) return;
+        sb.Append(", \"").Append(key).Append("\": [");
+        var first = true;
+        foreach (var s in symbols)
+        {
+            if (!first) sb.Append(", ");
+            sb.Append('"').Append(nameOf(s)).Append('"');
+            first = false;
+        }
+        sb.Append(']');
+    }
+
+    /// <summary>程序集版本去尾零修订号（0.0.9.0 → 0.0.9）</summary>
+    private static string TrimRevision(Version v) =>
+        v.Revision == 0 ? $"{v.Major}.{v.Minor}.{v.Build}" : v.ToString();
 
     private static bool ReturnsTask(IMethodSymbol m) =>
         m.ReturnType.Name is "Task" or "ValueTask";

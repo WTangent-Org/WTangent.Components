@@ -1,0 +1,8 @@
+<Project>
+  <!-- 生成器写 agent-component.json 需要的 MSBuild 属性（项目目录 / 程序集名）；
+       随包 buildTransitive 流入所有消费方 -->
+  <ItemGroup>
+    <CompilerVisibleProperty Include="ProjectDir" />
+    <CompilerVisibleProperty Include="AssemblyName" />
+  </ItemGroup>
+</Project>
