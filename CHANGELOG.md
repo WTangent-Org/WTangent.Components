@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.9](https://github.com/WTangent-Org/WTangent.Components/compare/v0.0.8...v0.0.9) (2026-08-23)
+
+
+### Features
+
+* App 静态属性构造注入（PCL-CE 式）：生成器产 static App + ctor，IEntry 移除 App 成员 ([318d122](https://github.com/WTangent-Org/WTangent.Components/commit/318d122040f55fe1aad244ac92645f881ea2309b))
+* Core 全局门面 Log/Config + 生成器构建时产出 agent-component.json（minCore 版本门禁） ([4d1eadd](https://github.com/WTangent-Org/WTangent.Components/commit/4d1eadd9f85ed622f6e5a6a9d3bfc28f99d8ac67))
+* 构造注入 App（无 null!）+ Current 静态桥（PCL-CE 式）；钩子实例方法，纯业务 ([668943a](https://github.com/WTangent-Org/WTangent.Components/commit/668943afb63615a60737078df1077bcaf8a504f6))
+
 ## [0.0.8](https://github.com/WTangent-Org/WTangent.Components/compare/v0.0.7...v0.0.8) (2026-08-22)
 
 
