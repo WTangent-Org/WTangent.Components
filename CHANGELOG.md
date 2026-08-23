@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.10](https://github.com/WTangent-Org/WTangent.Components/compare/v0.0.9...v0.0.10) (2026-08-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* Application 移除 Logger/Config（日志/配置统一走全局门面 Log/Config）；revert --skip-duplicate（会掩盖真实推送错误）
+
+### Features
+
+* Application 移除 Logger/Config（日志/配置统一走全局门面 Log/Config）；revert --skip-duplicate（会掩盖真实推送错误） ([333dd7a](https://github.com/WTangent-Org/WTangent.Components/commit/333dd7aba7d950372a2ca498527fee800c5406a8))
+
 ## [0.0.9](https://github.com/WTangent-Org/WTangent.Components/compare/v0.0.8...v0.0.9) (2026-08-23)
 
 
