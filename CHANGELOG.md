@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.11](https://github.com/WTangent-Org/WTangent.Components/compare/v0.0.10...v0.0.11) (2026-08-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* StartAsync()/生命周期钩子无参化——App 由构造注入（Entry.App），事件订阅经 App 接线
+
+### Features
+
+* StartAsync()/生命周期钩子无参化——App 由构造注入（Entry.App），事件订阅经 App 接线 ([5ea301a](https://github.com/WTangent-Org/WTangent.Components/commit/5ea301ae1ef0f4b0473a370b943539e94a2999f8))
+
 ## [0.0.10](https://github.com/WTangent-Org/WTangent.Components/compare/v0.0.9...v0.0.10) (2026-08-23)
 
 
