@@ -3,8 +3,7 @@ using System;
 namespace WTangent.Components;
 
 /// <summary>标记事件处理方法（static void 方法，参数 object? payload）：
-/// 源生成器收集进 partial Entry 的 CollectedSubscribe(IEventBus)，手写 Entry.StartAsync 里
-/// 调用 CollectedSubscribe(app.Events) 完成订阅。</summary>
+/// 源生成器在产出的 StartAsync() 里自动完成订阅（App.Events.Subscribe）。</summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
 public sealed class AgentEventAttribute(string key) : Attribute
 {

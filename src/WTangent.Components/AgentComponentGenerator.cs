@@ -170,22 +170,20 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         if (events.Length > 0 || startHook is not null)
         {
             var startAsync = startHook is not null && ReturnsTask(startHook);
-            sb.AppendLine("        /// <summary>启动：事件订阅接线 + [EntryStart] 钩子（生成器检测 async）</summary>");
-            sb.AppendLine(startAsync
-                ? "        public System.Threading.Tasks.Task StartAsync(WTangent.Core.Application app)"
-                : "        public System.Threading.Tasks.Task StartAsync(WTangent.Core.Application app)");
+            sb.AppendLine("        /// <summary>启动：事件订阅接线 + [EntryStart] 钩子（生成器检测 async；App 已由构造注入）</summary>");
+            sb.AppendLine("        public System.Threading.Tasks.Task StartAsync()");
             sb.AppendLine("        {");
             foreach (var m in events)
             {
                 var key = ReadEventKey(m);
                 if (key is null) continue;
                 var fmt = SymbolDisplayFormat.FullyQualifiedFormat.AddMemberOptions(SymbolDisplayMemberOptions.IncludeContainingType);
-                sb.AppendLine($"            app.Events.Subscribe(\"{key}\", {m.ToDisplayString(fmt)});");
+                sb.AppendLine($"            App.Events.Subscribe(\"{key}\", {m.ToDisplayString(fmt)});");
             }
             if (startHook is not null)
                 sb.AppendLine(startAsync
-                    ? $"            return {startHook.Name}(app);"
-                    : $"            {startHook.Name}(app);");
+                    ? $"            return {startHook.Name}();"
+                    : $"            {startHook.Name}();");
             if (!startAsync)
                 sb.AppendLine("            return System.Threading.Tasks.Task.CompletedTask;");
             sb.AppendLine("        }");

@@ -29,8 +29,8 @@ public interface IEntry
     /// <summary>作用域（事件键/服务命名前缀；缺省 = Identifier）</summary>
     string Scope => Identifier;
 
-    /// <summary>启动：宿主注入 Application（日志/事件/配置/存储/远程/服务注册表）；挂事件订阅在此</summary>
-    Task StartAsync(Application app) => Task.CompletedTask;
+    /// <summary>启动：挂事件订阅等初始化在此（App 已由构造注入——Entry.App 直达，无需再传）</summary>
+    Task StartAsync() => Task.CompletedTask;
 
     /// <summary>停止：清理资源（宿主退出时调用）</summary>
     Task StopAsync() => Task.CompletedTask;
