@@ -1,5 +1,3 @@
-using System;
-
 namespace WTangent.Components;
 
 /// <summary>标记事件处理方法（static void 方法，参数 object? payload）：

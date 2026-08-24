@@ -1,5 +1,3 @@
-using System;
-
 namespace WTangent.Components;
 
 /// <summary>标记组件入口类（IEntry 实现）：源生成器填充 partial Entry 的

@@ -1,5 +1,3 @@
-using System;
-
 namespace WTangent.Components;
 
 /// <summary>标记 LLM 工具实现类（ITool，来自 WTangent.Core）：源生成器收集进组件入口

@@ -1,5 +1,3 @@
-using System;
-
 namespace WTangent.Components;
 
 /// <summary>标记组件命令类（继承 System.CommandLine.Command 的类）：

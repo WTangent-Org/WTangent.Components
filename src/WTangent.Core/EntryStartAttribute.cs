@@ -1,5 +1,3 @@
-using System;
-
 namespace WTangent.Components;
 
 /// <summary>标记启动钩子（Entry 类内方法，**无参数**（App 走 Entry.App），static/instance 均可，void 或 Task）：

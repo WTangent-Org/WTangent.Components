@@ -1,5 +1,3 @@
-using System;
-
 namespace WTangent.Components;
 
 /// <summary>标记停止钩子（Entry 类内方法，static/instance 均可，void 或 Task）：

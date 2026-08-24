@@ -1,5 +1,3 @@
-using System.Net.Http;
-
 namespace WTangent.Core;
 
 /// <summary>组件运行时上下文：空壳启动时构造同一实例，经生成器注入每个组件
