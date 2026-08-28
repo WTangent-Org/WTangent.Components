@@ -230,7 +230,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
             {
                 sb.Append(", \"depends\": {");
                 var first = true;
-                foreach (var d in depends.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                foreach (var d in depends.Split([';'], StringSplitOptions.RemoveEmptyEntries))
                 {
                     var t = d.Trim();
                     var i = t.IndexOf(':');
