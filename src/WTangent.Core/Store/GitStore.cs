@@ -111,6 +111,9 @@ public sealed class GitStore(string repoDir)
         return sep < 0 ? null : match![(sep + 1)..].Trim();
     }
 
+    /// <summary>读目录的 .agent 项目名（静态版：不构造实例；不存在或缺失返回 null）</summary>
+    public static string? ManifestName(string dir) => new GitStore(dir).Manifest("name");
+
     private bool HasOrigin() =>
         RunCore("remote").Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Contains("origin");
 
