@@ -15,6 +15,12 @@
   <ItemGroup>
     <!-- IEntry.Commands 是 System.CommandLine.Command[]，契约引用它 -->
     <PackageReference Include="System.CommandLine" Version="2.0.10"/>
+    <!-- SessionStore 持久化（编译引用；组件包 ExcludeAssets=runtime，运行时由各组件自己的 Sqlite 引用带）；
+         AgentConfigStore 的 API Key 加密（仅 Windows 分支用） -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10"/>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10"/>
+    <!-- 覆盖传递依赖：Microsoft.Data.Sqlite 捆绑的 bundle_e_sqlite3 2.1.11 含 SQLite <3.50.2 漏洞（CVE-2025-6965，无补丁），显式提升到 2.1.12（与 Server/Tui 一致） -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12"/>
   </ItemGroup>
 
 </Project>

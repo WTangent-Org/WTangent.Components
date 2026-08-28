@@ -34,6 +34,7 @@ public sealed class DefaultConfig : IConfig
         using (_lock.EnterScope())
         {
             if (!_data.TryGetValue(key, out var v) || v is null) return default;
+            if (v is T typed) return typed;   // Set 后同进程读回：值是活对象（复杂类型不是 JsonElement）
             try { return (T)Convert.ChangeType(v, typeof(T)); }
             catch { return JsonSerializer.Deserialize<T>(((JsonElement)v).GetRawText()); }
         }
