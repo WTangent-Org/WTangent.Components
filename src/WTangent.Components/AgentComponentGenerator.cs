@@ -45,7 +45,8 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
             {
                 p.GlobalOptions.TryGetValue("build_property.ProjectDir", out var dir);
                 p.GlobalOptions.TryGetValue("build_property.AssemblyName", out var asm);
-                return (ProjDir: dir, AsmName: asm);
+                p.GlobalOptions.TryGetValue("build_property.ComponentDepends", out var deps);
+                return (ProjDir: dir, AsmName: asm, Depends: deps);
             });
 
         context.RegisterSourceOutput(
@@ -56,7 +57,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
                 var left = pair.Left.Left;   // (((((commands, tools), events), entries), scopes), rootNs)
                 Emit(spc, left.Left.Left.Left.Left.Left, left.Left.Left.Left.Left.Right,
                     left.Left.Left.Left.Right, left.Left.Left.Right, left.Left.Right, left.Right,
-                    pair.Left.Right, pair.Right.ProjDir, pair.Right.AsmName);
+                    pair.Left.Right, pair.Right.ProjDir, pair.Right.AsmName, pair.Right.Depends);
             });
     }
 
@@ -91,7 +92,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         ImmutableArray<INamedTypeSymbol> commands, ImmutableArray<INamedTypeSymbol> tools,
         ImmutableArray<IMethodSymbol> events, ImmutableArray<INamedTypeSymbol> entries,
         ImmutableArray<INamedTypeSymbol> scopes, string rootNs,
-        Compilation compilation, string? projDir, string? asmName)
+        Compilation compilation, string? projDir, string? asmName, string? depends)
     {
         if (commands.IsDefaultOrEmpty && tools.IsDefaultOrEmpty && events.IsDefaultOrEmpty
             && entries.IsDefaultOrEmpty && scopes.IsDefaultOrEmpty) return;
@@ -112,7 +113,7 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         }
         id ??= rootNs.Split('.').Last().ToLowerInvariant();
         displayName ??= id;
-        WriteManifest(projDir, asmName, id, commands, tools, compilation);
+        WriteManifest(projDir, asmName, id, depends, commands, tools, compilation);
         var scope = scopes.Select(ReadScopeAttr).FirstOrDefault(s => s is not null);
 
         var sb = new StringBuilder();
@@ -207,10 +208,11 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
         spc.AddSource("Entry.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
     }
 
-    /// <summary>写 agent-component.json 到仓根（空壳 install 时拉取）：name/asset/minCore/commands/tools。
+    /// <summary>写 agent-component.json 到仓根（空壳 install 时拉取）：name/asset/minCore/depends/commands/tools。
     /// minCore = 编译引用的 Core 程序集版本（空壳门禁：内置 Core 低于它则拒装）。
+    /// depends = csproj 的 ComponentDepends 属性（"别名:最低版本;别名2:最低版本2"），组件间编译期互引的运行时声明。
     /// 内容不变不写（避免反复触发增量重建）；写失败不炸构建，下次构建再写。</summary>
-    private static void WriteManifest(string? projDir, string? asmName, string id,
+    private static void WriteManifest(string? projDir, string? asmName, string id, string? depends,
         ImmutableArray<INamedTypeSymbol> commands, ImmutableArray<INamedTypeSymbol> tools,
         Compilation compilation)
     {
@@ -224,6 +226,21 @@ public sealed class AgentComponentGenerator : IIncrementalGenerator
               .Append("\", \"asset\": \"").Append(asmName is { Length: > 0 } ? asmName : id).Append('"');
             if (coreVer is not null)
                 sb.Append(", \"minCore\": \"").Append(TrimRevision(coreVer)).Append('"');
+            if (depends is { Length: > 0 })
+            {
+                sb.Append(", \"depends\": {");
+                var first = true;
+                foreach (var d in depends.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var t = d.Trim();
+                    var i = t.IndexOf(':');
+                    if (i <= 0) continue;
+                    if (!first) sb.Append(", ");
+                    sb.Append('"').Append(t.Substring(0, i)).Append("\": \"").Append(t.Substring(i + 1)).Append('"');
+                    first = false;
+                }
+                sb.Append('}');
+            }
             AppendNames(sb, "commands", commands, static c => GetCommandName(c));
             AppendNames(sb, "tools", tools, static t => t.Name);
             sb.AppendLine(" }");

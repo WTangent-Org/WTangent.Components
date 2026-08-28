@@ -4,5 +4,7 @@
   <ItemGroup>
     <CompilerVisibleProperty Include="ProjectDir" />
     <CompilerVisibleProperty Include="AssemblyName" />
+    <!-- 组件间依赖声明（csproj 的 ComponentDepends="别名:最低版本;..."）→ 生成器写进 agent-component.json 的 depends -->
+    <CompilerVisibleProperty Include="ComponentDepends" />
   </ItemGroup>
 </Project>
