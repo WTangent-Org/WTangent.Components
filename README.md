@@ -1,36 +1,23 @@
-# WtAgent.Components
+# WTangent.Components
 
-wtagent 组件**共享源生成器**（只做生成器——共享设施在 [WtAgent.Core](https://github.com/wtommy932/WtAgent.Core)）。
+wtangent 组件体系的**共享底座**：`WTangent.Core`（运行时契约 + 日志/配置/存储/LLM 等默认设施）+ 源生成器（`[AgentEntry]`/`[AgentCommand]`/`[AgentTool]`/`[EntryStart]` → 自动产出 Entry 接线）。
 
-## 用法
+## 引用方式（已去 nuget，纯源码引用）
+
+所有组件仓 / 空壳 csproj 直接 ProjectReference 本仓的**平级目录**（与 `D:\Agent` 工作区布局一致；CI checkout 同布局）：
 
 ```xml
-<PackageReference Include="WtAgent.Components" Version="0.3.x" PrivateAssets="all" />
-<Using Include="WtAgent.Components" />
+<ItemGroup>
+  <ProjectReference Include="..\WTangent.Components\src\WTangent.Core\WTangent.Core.csproj" Private="false"/>
+  <ProjectReference Include="..\WTangent.Components\src\WTangent.Components\Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" Private="false"/>
+</ItemGroup>
 ```
 
-## 特性
+- `Private="false"`：Core 不拷进组件输出/zip——运行期 Core 由空壳统一提供（单 ALC 简单名统一）
+- `WTangentDev=true` 构建时关闭上述引用（第三方 `wtangent dev restore` 的 props 注入模式，HintPath 指向 release 资产）
 
-- `[AgentComponent]`：标记 System.CommandLine `Command` 子类 → 编译期自动收集
-- `[AgentDefault]`：标记组件顶级行为方法（`static int Method(string[] args)`）
+## 发版
 
-## 生成结果（Entry 完整生成，组件不再手写）
+手动触发 Actions 的 release workflow → release-please 管版本（always-bump-patch）→ release 挂两个资产：`WTangent.Core.dll` + `WTangent.Components.dll`（生成器）。这两个 dll 是 `wtangent dev restore` 的直拉通道（组件开发者免工作区、免编译本仓）。
 
-```csharp
-// 组件里只写命令类：
-[AgentComponent]
-public sealed class ServeCommand : Command { ... }
-
-// 生成器自动产出（{RootNamespace}.Entry）：
-public static class Entry
-{
-    public static System.CommandLine.Command[] Commands { get; } = [new ServeCommand(), ...];
-    public static System.Func<string[], int>? Default => ...;   // [AgentDefault] 或 null
-}
-```
-
-新增命令 = 标个特性，**零手写注册**。
-
-## 发布
-
-手动发版（Actions 页 run release workflow，可填版本号）→ Trusted Publishing 发布 nuget.org（无 API key）。
+架构细节（加载模型/minCore 门禁/depends/发版顺序）以 `WTangent.Server/AGENTS.md` 为准。
