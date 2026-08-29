@@ -22,5 +22,3 @@ jobs:
           dotnet build src/WTangent.Components/Generator.csproj -c Release --nologo
           dotnet build src/WTangent.Core/WTangent.Core.csproj -c Release --nologo
 
-      - name: 打包项目（收拢 analyzers + lib）
-        run: dotnet build WTangent.Components.csproj -c Release --nologo

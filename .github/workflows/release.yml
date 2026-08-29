@@ -13,8 +13,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  # NuGet/login@v1（Trusted Publishing OIDC）需要
-  id-token: write
 
 jobs:
   release-please:
@@ -78,11 +76,10 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: 构建生成器 + 契约 + 打包
+      - name: 构建生成器 + 契约
         run: |
           dotnet build src/WTangent.Components/Generator.csproj -c Release --nologo
           dotnet build src/WTangent.Core/WTangent.Core.csproj -c Release --nologo
-          dotnet pack WTangent.Components.csproj -c Release -o out --nologo
 
       # dev restore 直拉通道：Core/生成器 dll 直接挂 release 资产（与组件 zip 同一条 GitHub 下载线，
       # 组件开发者 restore 免 nuget 通道；dll 是纯 IL 无平台之分，不按 rid 分包）
@@ -96,12 +93,3 @@ jobs:
             src/WTangent.Core/bin/Release/net10.0/WTangent.Core.dll \
             src/WTangent.Components/bin/Release/netstandard2.0/WTangent.Components.dll
 
-      # Trusted Publishing：nuget.org 策略绑定 Repository=WTangent-Org/WTangent.Components + Workflow File=release.yml
-      - name: NuGet login（Trusted Publishing）
-        id: login
-        uses: NuGet/login@v1
-        with:
-          user: wt598412
-
-      - name: 推送 nuget.org
-        run: dotnet nuget push out/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
