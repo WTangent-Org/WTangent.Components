@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.12](https://github.com/WTangent-Org/WTangent.Components/compare/v0.0.11...v0.0.12) (2026-08-29)
+
+
+### Features
+
+* AgentConfigStore 并入 Core（公开部分走 Config 门面存 config.json "agent" 键，API Key 仍单独 DPAPI 加密；旧顶层格式自动迁移）；SessionStore 随迁 Core（Server/Tui 各一份去重，逻辑未改）；csproj 补 Sqlite/ProtectedData 编译引用；DefaultConfig.Get 支持活对象同进程读回 ([c6af0a9](https://github.com/WTangent-Org/WTangent.Components/commit/c6af0a981c20a0e330d7f0eb274c8223d5f5d212))
+* Core 收录默认实现（Logger/EventBus/Config/Store/ServiceRegistry/GuiHost）+ LLM 设施（ProviderConfig/LlmClient）——空壳削薄 ([39b2c43](https://github.com/WTangent-Org/WTangent.Components/commit/39b2c436315e36eb528394466f39c52324c9b1dc))
+* GitStore.ManifestName 静态版（GitCmd 仓方法并入 Core，去重收尾） ([7cda682](https://github.com/WTangent-Org/WTangent.Components/commit/7cda682619147fd8ee2a53d6e6b19af411dbf52a))
+* 客户端协议层+存储层并入 Core（跨仓去重，逻辑未改）——AgentProtocol/IAgentClient(s)/ProtocolTypes/TokenUsage/RemoteAgentClient + AgentPaths/ServerRegistry/AgentCredentials/ConfirmProvider/GitStore/TokenMeter；RemoteEntry 拓宽 EtCode/Kind/Url（可选参数，源码兼容）；ServerRegistry 的 Entry.App.Store 改构造注入 IAppStore；顺带清理 8 处存量冗余 using ([37a85f4](https://github.com/WTangent-Org/WTangent.Components/commit/37a85f4b9c60476ef86b1920294256a150032882))
+* 生成器写 depends（csproj ComponentDepends 属性 → agent-component.json）；props 补 CompilerVisibleProperty ([a2b14e1](https://github.com/WTangent-Org/WTangent.Components/commit/a2b14e1c0a25b29cb4fe46d64ae0f560ea1b3f25))
+
 ## [0.0.11](https://github.com/WTangent-Org/WTangent.Components/compare/v0.0.10...v0.0.11) (2026-08-24)
 
 
