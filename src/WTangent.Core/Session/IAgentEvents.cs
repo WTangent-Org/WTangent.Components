@@ -16,4 +16,8 @@ public interface IAgentEvents
     void OnToolEnd(string name, string result) { }
     /// <summary>一轮完成（含工具结果）</summary>
     void OnTurnEnd(string? finalText) { }
+    /// <summary>危险命令确认请求（y/n；回执走 confirm 通道）</summary>
+    void OnConfirmReq(string id, string prompt) { }
+    /// <summary>结构化提问请求（askuser 工具；回执走 answer 通道，selected = 选项 label）</summary>
+    void OnQuestionReq(string id, string question, string header, string optionsJson) { }
 }

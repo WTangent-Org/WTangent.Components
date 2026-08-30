@@ -21,6 +21,8 @@ public enum SseEventType
     TurnEnd,
     /// <summary>流结束 data={}</summary>
     Done,
+    /// <summary>结构化提问 data={id,question,header,options,multiSelect}</summary>
+    QuestionReq,
 }
 
 /// <summary>SSE 事件载荷（data 为 JSON 文本，类型专属）</summary>
@@ -55,6 +57,11 @@ public sealed record WsEnvelope
     public bool? Allow { get; init; }
     public string? Prompt { get; init; }
     public string? FinalText { get; init; }
+    /// <summary>question_req：选项数组 JSON（[{label,description}]）与多选开关</summary>
+    public string? Options { get; init; }
+    public bool? MultiSelect { get; init; }
+    /// <summary>answer 回执：选中的选项 label（自由输入则为文本）</summary>
+    public string? Selected { get; init; }
 }
 
 public static class AgentProtocol
@@ -71,6 +78,7 @@ public static class AgentProtocol
         SseEventType.ConfirmReq => "confirm_req",
         SseEventType.TurnEnd => "turn_end",
         SseEventType.Done => "done",
+        SseEventType.QuestionReq => "question_req",
         _ => throw new ArgumentOutOfRangeException(nameof(t)),
     };
 
@@ -83,6 +91,7 @@ public static class AgentProtocol
         "confirm_req" => SseEventType.ConfirmReq,
         "turn_end" => SseEventType.TurnEnd,
         "done" => SseEventType.Done,
+        "question_req" => SseEventType.QuestionReq,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
@@ -93,6 +102,10 @@ public static class AgentProtocol
     public static SseEvent ConfirmReq(string id, string prompt) => new(SseEventType.ConfirmReq, JsonSerializer.Serialize(new SsePayload { Id = id, Prompt = prompt }, Json));
     public static SseEvent TurnEnd(string? finalText) => new(SseEventType.TurnEnd, JsonSerializer.Serialize(new SsePayload { FinalText = finalText }, Json));
     public static SseEvent Done() => new(SseEventType.Done, "{}");
+    public static SseEvent QuestionReq(string id, string question, string header, string optionsJson, bool multiSelect) =>
+        new(SseEventType.QuestionReq, JsonSerializer.Serialize(
+            new SsePayload { Id = id, Text = question, Name = header, Arguments = optionsJson },
+            Json));
 
     /// <summary>序列化为 SSE 块：`event: {name}\ndata: {json}\n\n`</summary>
     public static string Serialize(SseEvent e) => $"event: {e.Type.ToSseName()}\ndata: {e.Data}\n\n";
